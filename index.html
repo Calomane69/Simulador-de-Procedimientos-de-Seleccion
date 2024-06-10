@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Procedimientos de Selección</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Simulador de Procedimientos de Selección</h1>
+        <label for="procedureType">Tipo de Procedimiento:</label>
+        <select id="procedureType">
+            <option value="licitacion">Licitación Pública</option>
+            <option value="concurso">Concurso Público</option>
+            <option value="adjudicacion">Adjudicación Simplificada</option>
+        </select>
+        <table id="scheduleTable">
+            <thead>
+                <tr>
+                    <th>Etapa</th>
+                    <th>Fecha de Inicio</th>
+                    <th>Fecha de Fin</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Convocatoria</td>
+                    <td><input type="date" id="convocatoria" /></td>
+                    <td>-</td>
+                </tr>
+            </tbody>
+        </table>
+        <button onclick="clearData()">Limpiar</button>
+        <button onclick="setDeadline()">Optimizar Plazos</button>
+        <div id="error" class="error"></div>
+    </div>
+
+    <script>
+        const officialHolidays = [
+            "2024-01-01", "2024-04-18", "2024-04-19", "2024-05-01",
+            "2024-06-29", "2024-07-28", "2024-07-29", "2024-08-30",
+            "2024-10-08", "2024-11-01", "2024-12-08", "2024-12-25"
+        ];
+
+        function isWorkingDay(date) {
+            const day = date.getDay();
+            const dateString = date.toISOString().split('T')[0];
+            return day !== 0 && day !== 6 && !officialHolidays.includes(dateString);
+        }
+
+        function addWorkingDays(startDate, days) {
+            let currentDate = new Date(startDate);
+            let addedDays = 0;
+            while (addedDays < days) {
+                currentDate.setDate(currentDate.getDate() + 1);
+                if (isWorkingDay(currentDate)) {
+                    addedDays++;
+                }
+            }
+            return currentDate;
+        }
+
+        function clearData() {
+            document.getElementById("scheduleTable").querySelector("tbody").innerHTML = `
+                <tr>
+                    <td>Convocatoria</td>
+                    <td><input type="date" id="convocatoria" /></td>
+                    <td>-</td>
+                </tr>`;
+            document.getElementById("error").textContent = "";
+        }
+
+        function setDeadline() {
+            const type = document.getElementById("procedureType").value;
+            const convocatoriaDateInput = document.getElementById("convocatoria").value;
+
+            if (!convocatoriaDateInput) {
+                document.getElementById("error").textContent = "Por favor, ingrese la fecha de convocatoria.";
+                return;
+            }
+
+            let convocatoriaDate = new Date(convocatoriaDateInput);
+            if (!isWorkingDay(convocatoriaDate)) {
+                document.getElementById("error").textContent = "La fecha de convocatoria debe ser un día hábil.";
+                return;
+            }
+
+            let stages = [];
+
+            if (type === "licitacion" || type === "concurso") {
+                stages = [
+                    { name: "Registro de participantes", duration: 1 },
+                    { name: "Formulación de consultas y observaciones", duration: 10 },
+                    { name: "Absolución de consultas y observaciones e integración de bases", duration: 5 },
+                    { name: "Presentación de ofertas", duration: 1 },
+                    { name: "Evaluación y calificación de ofertas", duration: 2 },
+                    { name: "Otorgamiento de la buena pro", duration: 1 },
+                    { name: "Consentimiento de la buena pro", duration: 8 }
+                ];
+            } else if (type === "adjudicacion") {
+                stages = [
+                    { name: "Registro de participantes", duration: 1 },
+                    { name: "Formulación de consultas y observaciones", duration: 2 },
+                    { name: "Absolución de consultas y observaciones e integración de bases", duration: 2 },
+                    { name: "Presentación de ofertas", duration: 3 },
+                    { name: "Evaluación y calificación de ofertas", duration: 2 },
+                    { name: "Otorgamiento de la buena pro", duration: 1 },
+                    { name: "Consentimiento de la buena pro", duration: 5 }
+                ];
+            }
+
+            let currentStageDate = convocatoriaDate;
+            let scheduleData = [];
+            for (let i = 0; i < stages.length; i++) {
+                const stage = stages[i];
+                const start = addWorkingDays(currentStageDate, stage.duration === 1 ? 0 : 1);
+                const end = addWorkingDays(start, stage.duration - 1);
+                scheduleData.push({
+                    stage: stage.name,
+                    start: start.toISOString().split('T')[0],
+                    end: end.toISOString().split('T')[0]
+                });
+                currentStageDate = end;
+            }
+
+            const scheduleTable = document.getElementById("scheduleTable").querySelector("tbody");
+            scheduleTable.innerHTML = `
+                <tr>
+                    <td>Convocatoria</td>
+                    <td><input type="date" id="convocatoria" value="${convocatoriaDate.toISOString().split('T')[0]}" /></td>
+                    <td>-</td>
+                </tr>
+            ` + scheduleData.map(row => `
+                <tr>
+                    <td>${row.stage}</td>
+                    <td><input type="date" value="${row.start}" /></td>
+                    <td><input type="date" value="${row.end}" /></td>
+                </tr>
+            `).join("");
+
+            document.getElementById("error").textContent = "";
+        }
+    </script>
+</body>
+</html>
